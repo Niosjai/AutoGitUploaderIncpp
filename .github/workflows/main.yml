@@ -3,7 +3,7 @@ name: Build and Release AutoGitUploader
 on:
   push:
     tags:
-      - "v*"  # Triggers when you push a version tag like v1.0
+      - "v*"  # Triggers when you push a tag like v1.0
   workflow_dispatch:  # Allows manual triggering
 
 jobs:
@@ -20,19 +20,19 @@ jobs:
 
       - name: Install Dependencies (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt update && sudo apt install -y g++  
+        run: sudo apt update && sudo apt install -y g++ libcurl4-openssl-dev  
 
       - name: Install Dependencies (Windows)
         if: runner.os == 'Windows'
-        run: choco install mingw -y
+        run: choco install mingw curl -y
 
       - name: Compile (Linux)
         if: runner.os == 'Linux'
-        run: g++ -o AutoGitUploader AutoGitUploader.cpp -std=c++17
+        run: g++ -o AutoGitUploader AutoGitUploader.cpp -std=c++17 -lcurl
 
       - name: Compile (Windows)
         if: runner.os == 'Windows'
-        run: g++ -o AutoGitUploader.exe AutoGitUploader.cpp -std=c++17
+        run: g++ -o AutoGitUploader.exe AutoGitUploader.cpp -std=c++17 -lcurl
 
       - name: Upload Linux Binary
         if: runner.os == 'Linux'
