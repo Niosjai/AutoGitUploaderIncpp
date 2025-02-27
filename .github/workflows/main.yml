@@ -22,15 +22,24 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt update
-          sudo apt install -y g++ libcurl4-openssl-dev nlohmann-json3-dev  
+          sudo apt install -y g++ libcurl4-openssl-dev nlohmann-json3-dev
 
       - name: Install Dependencies (Windows)
         if: runner.os == 'Windows'
         run: |
-          choco install mingw curl -y
+          choco install mingw -y
+          # Download and extract cURL
+          curl -L -o curl.zip https://curl.se/windows/dl-8.8.1_5/curl-8.8.1_5-win64-mingw.zip
+          mkdir curl
+          tar -xf curl.zip -C curl --strip-components 1
+          # Add cURL to PATH
+          echo "$env:GITHUB_WORKSPACE/curl/bin" >> $env:GITHUB_PATH
+          # Set environment variables for build
+          echo "CURL_INCLUDE=$env:GITHUB_WORKSPACE/curl/include" >> $env:GITHUB_ENV
+          echo "CURL_LIB=$env:GITHUB_WORKSPACE/curl/lib" >> $env:GITHUB_ENV
+          # Download JSON library
           curl -L -o json.hpp https://github.com/nlohmann/json/releases/latest/download/json.hpp
           mkdir include && mv json.hpp include/
-          echo "C:\Program Files\Git\mingw64\bin" >> $GITHUB_PATH
 
       - name: Compile (Linux)
         if: runner.os == 'Linux'
@@ -40,8 +49,9 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           g++ -o AutoGitUploader.exe AutoGitUploader.cpp -std=c++17 `
-          -I"C:\Program Files\Git\mingw64\include" `
-          -L"C:\Program Files\Git\mingw64\lib" -lcurl
+          -I"${{ env.CURL_INCLUDE }}" `
+          -L"${{ env.CURL_LIB }}" `
+          -lcurl -lwldap32 -lws2_32
 
       - name: Upload Linux Binary
         if: runner.os == 'Linux'
