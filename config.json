@@ -1,0 +1,7 @@
+{
+    "GITHUB_TOKEN": "your-personal-access-token",
+    "GITHUB_USERNAME": "your-username",
+    "REPO_NAME": "AutoGitUploader.py",
+    "BRANCH": "main",
+    "HIDDEN": true
+}
