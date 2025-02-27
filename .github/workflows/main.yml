@@ -30,6 +30,7 @@ jobs:
           choco install mingw curl -y
           curl -L -o json.hpp https://github.com/nlohmann/json/releases/latest/download/json.hpp
           mkdir include && mv json.hpp include/
+          echo "C:\Program Files\Git\mingw64\bin" >> $GITHUB_PATH
 
       - name: Compile (Linux)
         if: runner.os == 'Linux'
@@ -37,7 +38,10 @@ jobs:
 
       - name: Compile (Windows)
         if: runner.os == 'Windows'
-        run: g++ -o AutoGitUploader.exe AutoGitUploader.cpp -std=c++17 -lcurl -Iinclude
+        run: |
+          g++ -o AutoGitUploader.exe AutoGitUploader.cpp -std=c++17 `
+          -I"C:\Program Files\Git\mingw64\include" `
+          -L"C:\Program Files\Git\mingw64\lib" -lcurl
 
       - name: Upload Linux Binary
         if: runner.os == 'Linux'
@@ -77,4 +81,4 @@ jobs:
             AutoGitUploader
             AutoGitUploader.exe
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GB_TOKEN }}
