@@ -1,0 +1,75 @@
+name: Build and Release AutoGitUploader
+
+on:
+  push:
+    tags:
+      - "v*"  # Triggers when you push a version tag like v1.0
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt update && sudo apt install -y g++  
+
+      - name: Install Dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: choco install mingw -y
+
+      - name: Compile (Linux)
+        if: runner.os == 'Linux'
+        run: g++ -o AutoGitUploader AutoGitUploader.cpp -std=c++17
+
+      - name: Compile (Windows)
+        if: runner.os == 'Windows'
+        run: g++ -o AutoGitUploader.exe AutoGitUploader.cpp -std=c++17
+
+      - name: Upload Linux Binary
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: AutoGitUploader-linux
+          path: AutoGitUploader
+
+      - name: Upload Windows Binary
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: AutoGitUploader-windows
+          path: AutoGitUploader.exe
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Linux Binary
+        uses: actions/download-artifact@v4
+        with:
+          name: AutoGitUploader-linux
+          path: .
+
+      - name: Download Windows Binary
+        uses: actions/download-artifact@v4
+        with:
+          name: AutoGitUploader-windows
+          path: .
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            AutoGitUploader
+            AutoGitUploader.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GB_TOKEN }}
