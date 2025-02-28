@@ -39,11 +39,11 @@ jobs:
           echo "CURL_LIB=$env:GITHUB_WORKSPACE/curl/lib" >> $env:GITHUB_ENV
           # Download JSON library
           curl -L -o json.hpp https://github.com/nlohmann/json/releases/latest/download/json.hpp
-          mkdir include && mv json.hpp include/
+          mkdir include && mv json.hpp nlohmann/include/
 
       - name: Compile (Linux)
         if: runner.os == 'Linux'
-        run: g++ -o AutoGitUploader AutoGitUploader.cpp -std=c++17 -lcurl
+        run: g++ -std=c++17 -o autogituploader AutoGitUploader.cpp -lcurl -lstdc++fs
 
       - name: Compile (Windows)
         if: runner.os == 'Windows'
