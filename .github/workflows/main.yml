@@ -40,6 +40,16 @@ jobs:
           echo "CURL_INCLUDE=C:/curl/include" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8
           echo "CURL_LIB=C:/curl/lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8
 
+      - name: Debug Paths (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          echo "Checking cURL headers in C:/curl/include:"
+          dir C:/curl/include
+          echo "Checking cURL library files in C:/curl/lib:"
+          dir C:/curl/lib
+          echo "CURL_INCLUDE=$env:CURL_INCLUDE"
+          echo "CURL_LIB=$env:CURL_LIB"
+
       - name: Download json.hpp (Windows)
         if: runner.os == 'Windows'
         run: |
@@ -53,7 +63,9 @@ jobs:
       - name: Compile (Windows)
         if: runner.os == 'Windows'
         run: |
-          g++ -std=c++17 -I"$env:GITHUB_WORKSPACE/include" -I"$env:CURL_INCLUDE" -L"$env:CURL_LIB" AutoGitUploader.cpp -o AutoGitUploader.exe -lcurl -lssl -lcrypto -lz -lws2_32
+          g++ -std=c++17 -I"C:/curl/include" -I"$env:GITHUB_WORKSPACE/include" `
+          -L"C:/curl/lib" AutoGitUploader.cpp -o AutoGitUploader.exe `
+          -lcurl -lssl -lcrypto -lz -lws2_32
 
       - name: Upload Linux Binary
         if: runner.os == 'Linux'
