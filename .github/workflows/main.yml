@@ -1,9 +1,12 @@
 name: Build and Release AutoGitUploader
 
 on:
+name: Build and Release AutoGitUploader
+
+on:
   push:
     tags:
-      - "github"  # Triggers when you push a tag like v1.0
+      - "v*"  # Triggers when you push a tag like v1.0
   workflow_dispatch:  # Allows manual triggering
 
 jobs:
@@ -29,32 +32,6 @@ jobs:
         run: |
           choco install mingw --version=12.2.0 -y
           echo "C:\ProgramData\chocolatey\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8
-
-      - name: Download and Extract cURL (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          Invoke-WebRequest -Uri "https://curl.se/windows/dl-8.12.1_3/curl-8.12.1_3-win64-mingw.zip" -OutFile "curl.zip"
-          Expand-Archive -Path "curl.zip" -DestinationPath "C:/"
-          Rename-Item -Path "C:/curl-8.12.1_3-win64-mingw" -NewName "C:/curl"
-          echo "C:/curl/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8
-          echo "CURL_INCLUDE=C:/curl/include" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8
-          echo "CURL_LIB=C:/curl/lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8
-
-      - name: Debug Paths (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          echo "Checking cURL headers in C:/curl/include:"
-          dir C:/curl/include
-          echo "Checking cURL library files in C:/curl/lib:"
-          dir C:/curl/lib
-          echo "CURL_INCLUDE=$env:CURL_INCLUDE"
-          echo "CURL_LIB=$env:CURL_LIB"
-
-      - name: Download json.hpp (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          New-Item -ItemType Directory -Path "$env:GITHUB_WORKSPACE/include/nlohmann" -Force
-          Invoke-WebRequest -Uri "https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp" -OutFile "$env:GITHUB_WORKSPACE/include/nlohmann/json.hpp"
 
       - name: Compile (Linux)
         if: runner.os == 'Linux'
@@ -85,9 +62,11 @@ jobs:
     name: Create Release
     needs: build
     runs-on: ubuntu-latest
-    # Only run if the workflow was triggered by a tag push
-    if: github.ref_type == 'tag'
+    if: startsWith(github.ref, 'refs/tags/v')  # Ensures release only runs when a tag is pushed
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
       - name: Download Linux Binary
         uses: actions/download-artifact@v4
         with:
@@ -103,9 +82,9 @@ jobs:
       - name: Publish Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}  # Explicitly set the tag name
+          tag_name: ${{ github.ref_name }}
           files: |
             AutoGitUploader
             AutoGitUploader.exe
         env:
-          GITHUB_TOKEN: ${{ secrets.GB_TOKEN }}  # Ensure correct token name
+          GITHUB_TOKEN: ${{ secrets.GB_TOKEN }}
