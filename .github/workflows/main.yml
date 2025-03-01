@@ -3,7 +3,7 @@ name: Build and Release AutoGitUploader
 on:
   push:
     tags:
-      - "v*"  # Triggers when you push a tag like v1.0
+      - "github"  # Triggers when you push a tag like v1.0
   workflow_dispatch:  # Allows manual triggering
 
 jobs:
