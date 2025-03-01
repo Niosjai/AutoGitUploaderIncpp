@@ -14,9 +14,9 @@ std::string GITHUB_TOKEN;
 std::string GITHUB_USERNAME;
 std::string REPO_NAME;
 std::string BRANCH;
-bool HIDDEN; // New configuration variable
+bool HIDDEN;
 
-// Function to load configuration from a JSON file
+// Load configuration from a JSON file
 void load_config(const std::string& config_file) {
     std::ifstream file(config_file);
     if (!file) {
@@ -25,13 +25,18 @@ void load_config(const std::string& config_file) {
     }
 
     json config;
-    file >> config;
+    try {
+        file >> config;
+    } catch (const json::parse_error& e) {
+        std::cerr << "Config JSON Error: " << e.what() << std::endl;
+        exit(1);
+    }
 
     GITHUB_TOKEN = config.value("GITHUB_TOKEN", "");
     GITHUB_USERNAME = config.value("GITHUB_USERNAME", "");
     REPO_NAME = config.value("REPO_NAME", "");
     BRANCH = config.value("BRANCH", "main");
-    HIDDEN = config.value("HIDDEN", true); // Default to true if not specified
+    HIDDEN = config.value("HIDDEN", true);
 
     if (GITHUB_TOKEN.empty() || GITHUB_USERNAME.empty() || REPO_NAME.empty()) {
         std::cerr << "Error: Missing required configuration in config file." << std::endl;
@@ -39,11 +44,13 @@ void load_config(const std::string& config_file) {
     }
 }
 
+// Callback function for CURL to write response data
 static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
     ((std::string*)userp)->append((char*)contents, size * nmemb);
     return size * nmemb;
 }
 
+// Base64 encode file content
 std::string base64_encode(const std::vector<unsigned char>& data) {
     const std::string base64_chars =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -87,6 +94,7 @@ std::string base64_encode(const std::vector<unsigned char>& data) {
     return encoded;
 }
 
+// URL encode file paths
 std::string url_encode_path(const std::string& path) {
     CURL* curl = curl_easy_init();
     std::ostringstream oss;
@@ -104,10 +112,11 @@ std::string url_encode_path(const std::string& path) {
     return oss.str();
 }
 
+// Perform a GET request to GitHub API
 std::string api_get_request(const std::string& url) {
     CURL* curl = curl_easy_init();
     std::string response;
-    struct curl_slist* headers = NULL;
+    struct curl_slist* headers = nullptr;
 
     if (curl) {
         headers = curl_slist_append(headers, ("Authorization: token " + GITHUB_TOKEN).c_str());
@@ -117,19 +126,25 @@ std::string api_get_request(const std::string& url) {
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-        curl_easy_setopt(curl, CURLOPT_USERAGENT, "curl/7.79.1");
+        curl_easy_setopt(curl, CURLOPT_USERAGENT, "AutoGitUploader/1.0");
+        curl_easy_setopt(curl, CURLOPT_CAINFO, "cacert.pem");  // SSL certificate bundle
 
-        curl_easy_perform(curl);
+        CURLcode res = curl_easy_perform(curl);
+        if (res != CURLE_OK) {
+            std::cerr << "CURL Error: " << curl_easy_strerror(res) << std::endl;
+        }
+
         curl_slist_free_all(headers);
         curl_easy_cleanup(curl);
     }
     return response;
 }
 
+// Perform a PUT request to GitHub API
 bool api_put_request(const std::string& url, const std::string& data) {
     CURL* curl = curl_easy_init();
-    struct curl_slist* headers = NULL;
-    long response_code;
+    struct curl_slist* headers = nullptr;
+    long response_code = 0;
     std::string response;
 
     if (curl) {
@@ -144,29 +159,32 @@ bool api_put_request(const std::string& url, const std::string& data) {
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-        curl_easy_setopt(curl, CURLOPT_USERAGENT, "curl/7.79.1");
+        curl_easy_setopt(curl, CURLOPT_USERAGENT, "AutoGitUploader/1.0");
+        curl_easy_setopt(curl, CURLOPT_CAINFO, "cacert.pem");  // SSL certificate bundle
 
-        curl_easy_perform(curl);
+        CURLcode res = curl_easy_perform(curl);
+        if (res != CURLE_OK) {
+            std::cerr << "CURL Error: " << curl_easy_strerror(res) << std::endl;
+        }
+
         curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
-        
         curl_slist_free_all(headers);
         curl_easy_cleanup(curl);
     }
     return response_code == 200 || response_code == 201;
 }
 
+// Get list of files to upload
 std::vector<std::filesystem::path> get_files_to_upload() {
     std::vector<std::filesystem::path> files;
-    for (auto it = std::filesystem::recursive_directory_iterator("."); 
+    for (auto it = std::filesystem::recursive_directory_iterator(".");
          it != std::filesystem::recursive_directory_iterator(); ++it) {
-        
         const auto& entry = *it;
 
-        // Skip hidden directories if HIDDEN is false
         if (entry.is_directory()) {
             std::string dirname = entry.path().filename().string();
             if (!HIDDEN && dirname[0] == '.') {
-                it.disable_recursion_pending(); // Prevent entering the directory
+                it.disable_recursion_pending();
                 continue;
             }
         }
@@ -175,12 +193,15 @@ std::vector<std::filesystem::path> get_files_to_upload() {
             std::string filename = entry.path().filename().string();
             std::string ext = entry.path().extension().string();
 
-            
-            if (filename == "config.json" || filename == "autogituploader" || filename == "AutoGitUploader.cpp" || ext == ".bak") {
+            if (filename == "config.json" || 
+                filename == "autogituploader" || 
+                filename == "AutoGitUploader.cpp" || 
+                filename == "cacert.pem" || 
+                filename == "libcurl-x64.dll" || // Now correctly excluding libcurl-x64
+                ext == ".bak") {
                 continue;
             }
 
-            // Skip hidden files if HIDDEN is false
             if (!HIDDEN && filename[0] == '.') {
                 continue;
             }
@@ -191,9 +212,13 @@ std::vector<std::filesystem::path> get_files_to_upload() {
     return files;
 }
 
+// Upload a file to GitHub
 void upload_file(const std::filesystem::path& path) {
     std::ifstream file(path, std::ios::binary | std::ios::ate);
-    if (!file) return;
+    if (!file) {
+        std::cerr << "❌ Failed to open file: " << path << std::endl;
+        return;
+    }
 
     std::vector<unsigned char> content(file.tellg());
     file.seekg(0);
@@ -201,12 +226,27 @@ void upload_file(const std::filesystem::path& path) {
 
     std::string github_path = path.generic_string();
     if (github_path.find("./") == 0) github_path.erase(0, 2);
-    std::string api_url = "https://api.github.com/repos/" + GITHUB_USERNAME + "/" + REPO_NAME + 
+    std::string api_url = "https://api.github.com/repos/" + GITHUB_USERNAME + "/" + REPO_NAME +
                         "/contents/" + url_encode_path(github_path);
 
-    json get_response = json::parse(api_get_request(api_url));
+    std::string response = api_get_request(api_url);
+    if (response.empty()) {
+        std::cerr << "❌ Empty API response for: " << github_path
+                  << "\n   Check: Token permissions, repo existence, and network connection" << std::endl;
+        return;
+    }
+
+    json get_response;
+    try {
+        get_response = json::parse(response);
+    } catch (const json::parse_error& e) {
+        std::cerr << "❌ JSON Error (" << github_path << "): " << e.what()
+                  << "\n   API Response: " << response << std::endl;
+        return;
+    }
+
     json put_data = {
-        {"message", "uploaded via automation script by mario 🚀"},
+        {"message", "Uploaded via automation script by Mario 🚀"},
         {"content", base64_encode(content)},
         {"branch", BRANCH}
     };
@@ -219,12 +259,19 @@ void upload_file(const std::filesystem::path& path) {
     std::cout << (success ? "✅ " : "❌ ") << github_path << std::endl;
 }
 
+// Main function
 int main() {
-    // Load configuration from config.json
     load_config("config.json");
-
     curl_global_init(CURL_GLOBAL_ALL);
-    for (const auto& file : get_files_to_upload()) upload_file(file);
+
+    try {
+        auto files = get_files_to_upload();
+        std::cout << "Found " << files.size() << " files to upload\n";
+        for (const auto& file : files) upload_file(file);
+    } catch (const std::exception& e) {
+        std::cerr << "Fatal Error: " << e.what() << std::endl;
+    }
+
     curl_global_cleanup();
     return 0;
 }
