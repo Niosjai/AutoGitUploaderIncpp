@@ -3,7 +3,7 @@ name: Build and Release AutoGitUploader
 on:
   push:
     tags:
-      - "v1"  # Triggers when you push a tag like v1.0
+      - "v*"  # Triggers when you push a tag like v1.0
   workflow_dispatch:  # Allows manual triggering
 
 jobs:
@@ -85,6 +85,8 @@ jobs:
     name: Create Release
     needs: build
     runs-on: ubuntu-latest
+    # Only run if the workflow was triggered by a tag push
+    if: github.ref_type == 'tag'
     steps:
       - name: Download Linux Binary
         uses: actions/download-artifact@v4
@@ -101,8 +103,9 @@ jobs:
       - name: Publish Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_name }}  # Explicitly set the tag name
           files: |
             AutoGitUploader
             AutoGitUploader.exe
         env:
-          GITHUB_TOKEN: ${{ secrets.GB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GB_TOKEN }}  # Ensure correct token name
