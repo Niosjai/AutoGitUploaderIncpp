@@ -27,31 +27,33 @@ jobs:
       - name: Install Dependencies (Windows)
         if: runner.os == 'Windows'
         run: |
-          choco install mingw -y
-          # Download and extract cURL
-          curl -L -o curl.zip https://curl.se/windows/dl-8.8.1_5/curl-8.8.1_5-win64-mingw.zip
-          mkdir curl
-          tar -xf curl.zip -C curl --strip-components 1
-          # Add cURL to PATH
-          echo "$env:GITHUB_WORKSPACE/curl/bin" >> $env:GITHUB_PATH
-          # Set environment variables for build
-          echo "CURL_INCLUDE=$env:GITHUB_WORKSPACE/curl/include" >> $env:GITHUB_ENV
-          echo "CURL_LIB=$env:GITHUB_WORKSPACE/curl/lib" >> $env:GITHUB_ENV
-          # Download JSON library
-          curl -L -o json.hpp https://github.com/nlohmann/json/releases/latest/download/json.hpp
-          mkdir include && mv json.hpp nlohmann/include/
+          choco install mingw --version=12.2.0 -y
+          echo "C:\ProgramData\chocolatey\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8
+
+      - name: Download and Extract cURL (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          Invoke-WebRequest -Uri "https://curl.se/windows/dl-8.12.1_3/curl-8.12.1_3-win64-mingw.zip" -OutFile "curl.zip"
+          Expand-Archive -Path "curl.zip" -DestinationPath "C:/"
+          Rename-Item -Path "C:/curl-8.12.1_3-win64-mingw" -NewName "C:/curl"
+          echo "C:/curl/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8
+          echo "CURL_INCLUDE=C:/curl/include" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8
+          echo "CURL_LIB=C:/curl/lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8
+
+      - name: Download json.hpp (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          New-Item -ItemType Directory -Path "$env:GITHUB_WORKSPACE/include/nlohmann" -Force
+          Invoke-WebRequest -Uri "https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp" -OutFile "$env:GITHUB_WORKSPACE/include/nlohmann/json.hpp"
 
       - name: Compile (Linux)
         if: runner.os == 'Linux'
-        run: g++ -std=c++17 -o autogituploader AutoGitUploader.cpp -lcurl -lstdc++fs
+        run: g++ -std=c++17 -o AutoGitUploader AutoGitUploader.cpp -lcurl -lstdc++fs
 
       - name: Compile (Windows)
         if: runner.os == 'Windows'
         run: |
-          g++ -o AutoGitUploader.exe AutoGitUploader.cpp -std=c++17 `
-          -I"${{ env.CURL_INCLUDE }}" `
-          -L"${{ env.CURL_LIB }}" `
-          -lcurl -lwldap32 -lws2_32
+          g++ -std=c++17 -I"$env:GITHUB_WORKSPACE/include" -I"$env:CURL_INCLUDE" -L"$env:CURL_LIB" AutoGitUploader.cpp -o AutoGitUploader.exe -lcurl -lssl -lcrypto -lz -lws2_32
 
       - name: Upload Linux Binary
         if: runner.os == 'Linux'
