@@ -1,9 +1,6 @@
 name: Build and Release AutoGitUploader
 
 on:
-name: Build and Release AutoGitUploader
-
-on:
   push:
     tags:
       - "v*"  # Triggers when you push a tag like v1.0
